@@ -27,4 +27,4 @@ jobs:
         run: ./gradlew :dragttoreveal:assembleRelease
 
       - name: Run tests
-        run: ./gradlew :dragttoreveal:test
+        run: ./gradlew :dragtoreveal:test
