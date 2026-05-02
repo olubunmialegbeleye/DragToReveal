@@ -24,7 +24,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build
-        run: ./gradlew :dragttoreveal:assembleRelease
+        run: ./gradlew :dragtoreveal:assembleRelease
 
       - name: Run tests
         run: ./gradlew :dragtoreveal:test
