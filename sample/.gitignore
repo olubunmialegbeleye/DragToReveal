@@ -1,0 +1,17 @@
+# IntelliJ/Android Studio
+*.iml
+.idea/
+.gradle/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Local configuration
+local.properties
+*.keystore
+*.jks
+
+# OS specific
+.DS_Store
+**/*.DS_Store

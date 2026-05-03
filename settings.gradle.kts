@@ -24,4 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "DragToReveal"
 include(":dragtoreveal")
- 
+include(":sample")
