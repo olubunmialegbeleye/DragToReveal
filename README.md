@@ -2,16 +2,20 @@
 
 A three-anchor swipe-to-reveal component for Jetpack Compose. Matches the interaction model of iOS `swipeActions` — items slide left to reveal contextual actions, rest at a midpoint anchor, and fully dismiss with a colour-flood confirmation signal.
 
-> **Status:** `0.1.0-alpha02` — API is still settling. Minor versions may introduce breaking changes until `1.0.0`.
+> **Status:** `0.1.0` — API is still settling. Minor versions may introduce breaking changes until `1.0.0`.
 
 ---
+
+<!--
 
 ## Preview
 
-<!-- Replace with an actual screen recording GIF once available -->
+Replace with an actual screen recording GIF once available
 ![DragToReveal demo](docs/demo.gif)
 
 ---
+
+-->
 
 ## Features
 
@@ -47,7 +51,7 @@ Add the dependency:
 ```kotlin
 // build.gradle.kts (app or feature module)
 dependencies {
-    implementation("io.github.olubunmialegbeleye:DragToReveal:v0.1.0-alpha02")
+    implementation("com.github.olubunmialegbeleye:DragToReveal:v0.1.0")
 }
 ```
 
