@@ -1,7 +1,9 @@
 package io.github.olubunmialegbeleye.dragtoreveal
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 
 class DragToRevealState {
@@ -16,3 +18,6 @@ class DragToRevealState {
         if (openItemKey == key) openItemKey = null
     }
 }
+
+@Composable
+fun rememberDragToRevealState(): DragToRevealState = remember { DragToRevealState() }
