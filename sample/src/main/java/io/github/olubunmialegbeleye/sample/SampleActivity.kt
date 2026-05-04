@@ -114,10 +114,14 @@ fun SampleList(modifier: Modifier = Modifier) {
                     persistentListOf(
                         RevealAction(
                             key = "delete",
-                            backgroundColor = Color(0xFFE53935),
                             contentDescription = "Delete",
                             onClick = { items.remove(item) },
-                            content = { ActionIcon(Icons.Default.Delete) }
+                            content = {
+                                ActionIcon(
+                                    icon = Icons.Default.Delete,
+                                    modifier = Modifier.background(color = Color(0xFFE53935))
+                                )
+                            }
                         )
                     )
                 }
@@ -125,10 +129,12 @@ fun SampleList(modifier: Modifier = Modifier) {
                     persistentListOf(
                         RevealAction(
                             key = "share",
-                            backgroundColor = Color(0xFF1E88E5),
                             contentDescription = "Share",
                             onClick = { /* Handle share */ },
-                            content = { ActionIcon(Icons.Default.Share) }
+                            content = { ActionIcon(
+                                icon = Icons.Default.Share,
+                                modifier = Modifier.background(color = Color(0xFF1E88E5))
+                            ) }
                         )
                     )
                 }
@@ -136,17 +142,24 @@ fun SampleList(modifier: Modifier = Modifier) {
                     persistentListOf(
                         RevealAction(
                             key = "more",
-                            backgroundColor = Color(0xFF757575),
                             contentDescription = "More",
                             onClick = { /* Handle more */ },
-                            content = { ActionIcon(Icons.Default.MoreVert) }
+                            content = {
+                                ActionIcon(
+                                    icon = Icons.Default.MoreVert,
+                                    modifier = Modifier.fillMaxSize().background(color = Color(0xFF757575))
+                                )
+                            }
                         ),
                         RevealAction(
                             key = "email",
-                            backgroundColor = Color(0xFF43A047),
                             contentDescription = "Email",
                             onClick = { /* Handle email */ },
-                            content = { ActionIcon(Icons.Default.Email) }
+                            content = { ActionIcon(
+                                icon = Icons.Default.Email,
+                                modifier = Modifier.fillMaxSize().background(color = Color(0xFF43A047))
+                            )
+                            }
                         )
                     )
                 }
@@ -154,7 +167,6 @@ fun SampleList(modifier: Modifier = Modifier) {
                     persistentListOf(
                         RevealAction(
                             key = "favorite",
-                            backgroundColor = if (item.isFavorite) Color(0xFFFFB300) else Color(0xFFFB8C00),
                             contentDescription = "Favorite",
                             onClick = { 
                                 val index = items.indexOf(item)
@@ -163,15 +175,20 @@ fun SampleList(modifier: Modifier = Modifier) {
                                 }
                             },
                             content = { 
-                                ActionIcon(if (item.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder) 
+                                ActionIcon(
+                                    icon = if (item.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    modifier = Modifier.fillMaxSize().background(color = if (item.isFavorite) Color(0xFFFFB300) else Color(0xFFFB8C00))
+                                )
                             }
                         ),
                         RevealAction(
                             key = "delete",
-                            backgroundColor = Color(0xFFE53935),
                             contentDescription = "Delete",
                             onClick = { items.remove(item) },
-                            content = { ActionIcon(Icons.Default.Delete) }
+                            content = { ActionIcon(
+                                icon = Icons.Default.Delete,
+                                modifier = Modifier.fillMaxSize().background(color = Color(0xFFE53935))
+                            ) }
                         )
                     )
                 }
@@ -190,12 +207,15 @@ fun SampleList(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun ActionIcon(icon: ImageVector) {
+fun ActionIcon(
+    icon: ImageVector,
+    modifier: Modifier = Modifier
+) {
     Icon(
         imageVector = icon,
         contentDescription = null,
-        tint = Color.Green,
-        modifier = Modifier.size(24.dp)
+        tint = Color.White,
+        modifier = modifier//.size(24.dp)
     )
 }
 
