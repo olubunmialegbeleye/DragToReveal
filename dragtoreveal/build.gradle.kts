@@ -96,7 +96,7 @@ afterEvaluate {
         repositories {
             maven {
                 name = "GitHubPackages"
-                url  = uri("https://maven.pkg.github.com/yourusername/DragToReveal")
+                url  = uri("https://maven.pkg.github.com/olubunmialegbeleye/DragToReveal")
                 credentials {
                     username = System.getenv("GITHUB_ACTOR")
                     password = System.getenv("GITHUB_TOKEN")
