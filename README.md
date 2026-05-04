@@ -47,7 +47,7 @@ Add the dependency:
 ```kotlin
 // build.gradle.kts (app or feature module)
 dependencies {
-    implementation("com.github.olubunmialegbeleye:DragToReveal:v0.1.0-alpha02")
+    implementation("io.github.olubunmialegbeleye:DragToReveal:v0.1.0-alpha02")
 }
 ```
 
