@@ -1,8 +1,13 @@
+@file:OptIn(ExperimentalFoundationApi::class)
+
 package io.github.olubunmialegbeleye.dragtoreveal
 
+import android.annotation.SuppressLint
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.AnchoredDraggableState
-import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.animateTo
@@ -19,7 +24,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -30,21 +34,35 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
+private const val DEFAULT_POSITIONAL_THRESHOLD = 0.5f
+
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun<T> DragToReveal(
     actions: PersistentList<RevealAction>,
     itemKey: T,
     revealState: DragToRevealState<T>,
     modifier: Modifier = Modifier,
+    initialAnchor: DragAnchor = DragAnchor.Resting,
+    enabled: Boolean = true,
+    fullDismissEnabled: Boolean = true,
+    positionalThreshold: (totalDistance: Float) -> Float = { it * DEFAULT_POSITIONAL_THRESHOLD },
+    velocityThreshold: Dp = 125.dp,
+    animationSpec: AnimationSpec<Float> = spring(),
     defaultActionKey: String = actions.last().key,
     content: @Composable (() -> Unit),
 ) {
@@ -65,28 +83,20 @@ fun<T> DragToReveal(
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        val density = LocalDensity.current
+        val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
         val fullDismissPx = constraints.maxWidth.toFloat()
 
-        val peekWidthPx =
-            remember(actions, density) {
-                actions.sumOf { with(density) { it.width.toPx().toDouble() } }.toFloat()
-            }
-
-        val restingPx = 0f
-
-        val anchors =
-            remember(actions, density, fullDismissPx) {
-                DraggableAnchors {
-                    DragAnchor.Resting at restingPx
-                    DragAnchor.Peeked at -peekWidthPx
-                    DragAnchor.Dismissed at -fullDismissPx
-                }
-            }
-
-        val state: AnchoredDraggableState<DragAnchor> = remember { AnchoredDraggableState(initialValue = DragAnchor.Resting) }
-
-        SideEffect { state.updateAnchors(anchors) }
+        val (peekWidthPx, state) = rememberDragStateHolder(
+            itemKey = itemKey,
+            actions = actions,
+            fullDismissPx = fullDismissPx,
+            fullDismissEnabled = fullDismissEnabled,
+            isRtl = isRtl,
+            positionalThreshold = positionalThreshold,
+            velocityThreshold = velocityThreshold,
+            animationSpec = animationSpec,
+            initialAnchor = initialAnchor,
+        )
 
         DragToRevealEffects(
             state = state,
@@ -97,7 +107,7 @@ fun<T> DragToReveal(
 
         val scope = rememberCoroutineScope()
         val currentOffset = if (state.offset.isNaN()) 0f else state.offset
-        val revealedPx = -currentOffset
+        val revealedPx = abs(currentOffset)
 
         RevealBackground(
             actions = actions,
@@ -106,11 +116,11 @@ fun<T> DragToReveal(
             defaultActionKey = defaultActionKey,
             onActionClick = { onClick ->
                 onClick()
-                scope.launch { state.snapTo(DragAnchor.Resting) }
+                scope.launch { state.animateTo(DragAnchor.Resting) }
             },
             modifier =
                 Modifier
-                    .align(Alignment.CenterEnd)
+                    .align(if (isRtl) Alignment.CenterStart else Alignment.CenterEnd)
                     .fillMaxHeight(),
         )
 
@@ -118,8 +128,8 @@ fun<T> DragToReveal(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .offset { IntOffset(state.requireOffset().roundToInt(), 0) }
-                    .anchoredDraggable(state, Orientation.Horizontal),
+                    .offset { IntOffset(if (state.offset.isNaN()) 0 else state.offset.roundToInt(), 0) }
+                    .anchoredDraggable(state, Orientation.Horizontal, enabled = enabled),
             color = Color.Transparent,
         ) {
             content()
@@ -142,6 +152,7 @@ private fun<T> DragToRevealEffects(
                     DragAnchor.Resting -> revealState.onItemClosed(itemKey)
                     DragAnchor.Peeked -> revealState.onItemOpened(itemKey)
                     DragAnchor.Dismissed -> {
+                        // unreachable when fullDismissEnabled = false (anchor not registered)
                         currentDefaultAction?.onClick()
                         state.snapTo(DragAnchor.Resting)
                     }
@@ -157,7 +168,7 @@ private fun<T> DragToRevealEffects(
 }
 
 @Composable
-fun RevealBackground(
+internal fun RevealBackground(
     actions: PersistentList<RevealAction>,
     revealedPx: Float,
     peekWidthPx: Float,
@@ -220,22 +231,40 @@ fun RevealBackground(
     }
 }
 
+private val previewActions = persistentListOf(
+    RevealAction(
+        key = "Delete",
+        contentDescription = "Delete",
+        onClick = {},
+        content = { slotState ->
+            Text(
+                text = "Delete",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White.copy(alpha = slotState.revealFraction),
+            )
+        },
+    ),
+)
+
 @Preview
 @Composable
-private fun PreviewDragToReveal() {
+private fun PreviewDragToRevealResting() {
     DragToReveal(
-        actions =
-            persistentListOf(
-                RevealAction(
-                    key = "Delete",
-                    contentDescription = "Delete",
-                    onClick = {},
-                    content = {
-
-                    },
-                ),
-            ),
+        actions = previewActions,
         itemKey = "1",
+        revealState = rememberDragToRevealState(),
+    ) {
+        Text(text = "Item to Drag", style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+@Preview
+@Composable
+private fun PreviewDragToRevealPeeked() {
+    DragToReveal(
+        actions = previewActions,
+        itemKey = "1",
+        initialAnchor = DragAnchor.Peeked,
         revealState = rememberDragToRevealState(),
     ) {
         Text(text = "Item to Drag", style = MaterialTheme.typography.titleMedium)
