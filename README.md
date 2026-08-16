@@ -20,13 +20,19 @@ Replace with an actual screen recording GIF once available
 ## Features
 
 - **Three named anchors** — Resting, Peeked (actions visible), and Dismissed
-- **Variable actions** — one action or many; each with its own width, colour, and composable content
+- **Generic item keys** — `itemKey`/`DragToRevealState` work with any stable key type, not just `String`
+- **Variable actions** — one action or many; each with its own width and composable content
 - **Default action** — the primary/destructive action stretches in phase 2 and fires on a full swipe
+- **Optional full dismiss** — set `fullDismissEnabled = false` to cap the gesture at the Peeked anchor (menu-only, no swipe-to-delete)
+- **Configurable gesture feel** — override `positionalThreshold`, `velocityThreshold`, and `animationSpec` per instance
+- **RTL aware** — reveal direction follows `LocalLayoutDirection` automatically
 - **Mutual exclusion** — opening one item in a list automatically closes all others
-- **Colour-flood signal** — non-default actions dim when a full swipe is imminent, matching iOS UX
+- **Reveal-fraction driven styling** — action content receives a `RevealActionSlotState` (`isDefault`, `revealFraction`, `isExpanded`) so colour/alpha/scale live in your composable instead of being imposed by the library
+- **Haptic feedback** — a confirmation tick fires when the drag crosses into the Dismissed anchor
 - **Tap outside to close** — tapping the item content while open closes it
 - **Zero recomposition during drag** — offset changes run entirely in the draw phase
-- **Accessibility** — each action slot exposes a TalkBack click label via `contentDescription`
+- **Accessibility** — `contentDescription` drives TalkBack labels, plus a `stateDescription` (Expanded/Collapsed) and per-action `CustomAccessibilityAction`s so switch/TalkBack users can trigger actions without dragging
+- **Disableable** — pass `enabled = false` to freeze the gesture (e.g. while a row is mid-animation elsewhere)
 
 ---
 
@@ -129,7 +135,7 @@ fun NotificationList(messages: List<Message>) {
     // Create ONE shared state for the entire list.
     // This is what enforces mutual exclusion — do not
     // move this inside the item composable.
-    val revealState = rememberDragToRevealState()
+    val revealState = rememberDragToRevealState<String>()
 
     LazyColumn {
         items(messages, key = { it.id }) { message ->
@@ -139,20 +145,26 @@ fun NotificationList(messages: List<Message>) {
                 actions     = persistentListOf(
                     RevealAction(
                         key                = "mark_read",
-                        backgroundColor    = Color(0xFF5B2D8E),
                         contentDescription = "Mark as read",
                         onClick            = { /* handle */ },
-                        content            = {
-                            Icon(Icons.Default.Check, null, tint = Color.White)
+                        content            = { slotState ->
+                            Icon(
+                                Icons.Default.Check, null,
+                                tint = Color.White,
+                                modifier = Modifier.background(Color(0xFF5B2D8E)),
+                            )
                         },
                     ),
                     RevealAction(
                         key                = "delete",
-                        backgroundColor    = Color(0xFFE05252),
                         contentDescription = "Delete",
                         onClick            = { /* handle */ },
-                        content            = {
-                            Icon(Icons.Default.Delete, null, tint = Color.White)
+                        content            = { slotState ->
+                            Icon(
+                                Icons.Default.Delete, null,
+                                tint = Color.White,
+                                modifier = Modifier.background(Color(0xFFE05252)),
+                            )
                         },
                     ),
                 ),
@@ -180,10 +192,15 @@ DragToReveal(
     actions     = persistentListOf(
         RevealAction(
             key                = "delete",
-            backgroundColor    = Color(0xFFE05252),
             contentDescription = "Delete",
             onClick            = { viewModel.delete(item) },
-            content            = { Icon(Icons.Default.Delete, null, tint = Color.White) },
+            content            = { slotState ->
+                Icon(
+                    Icons.Default.Delete, null,
+                    tint = Color.White,
+                    modifier = Modifier.background(Color(0xFFE05252)),
+                )
+            },
         ),
     ),
 ) {
@@ -230,23 +247,57 @@ DragToReveal(
 
 ### Icon + label layout
 
-`RevealAction.content` is a free composable slot — render anything inside it:
+`RevealAction.content` is a free composable slot that receives a `RevealActionSlotState` — render anything inside it, and apply your own background/tint:
 
 ```kotlin
 RevealAction(
     key                = "delete",
     width              = 80.dp,   // wider to accommodate the label
-    backgroundColor    = Color(0xFFE05252),
     contentDescription = "Delete",
     onClick            = { viewModel.delete(item) },
-    content            = {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    content            = { slotState ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFE05252)),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             Icon(Icons.Default.Delete, null, tint = Color.White)
             Spacer(Modifier.height(4.dp))
             Text("Delete", color = Color.White, fontSize = 11.sp)
         }
     },
 )
+```
+
+### Reacting to `RevealActionSlotState`
+
+Each action's `content` is invoked with a `RevealActionSlotState(isDefault, revealFraction, isExpanded)`. Use it to fade non-default actions in during phase 1, or restyle the default action once it stretches past the peek width in phase 2 — the library no longer imposes an alpha/colour treatment for you:
+
+```kotlin
+content = { slotState ->
+    Icon(
+        Icons.Default.Delete,
+        null,
+        tint = Color.White,
+        modifier = Modifier
+            .background(Color(0xFFE05252))
+            .alpha(if (slotState.isDefault) 1f else slotState.revealFraction),
+    )
+}
+```
+
+### Menu-only rows (no full dismiss)
+
+Set `fullDismissEnabled = false` to cap the drag at the Peeked anchor — useful when actions shouldn't be triggerable by a fast fling, only by tapping:
+
+```kotlin
+DragToReveal(
+    itemKey             = item.id,
+    revealState         = revealState,
+    fullDismissEnabled  = false,
+    actions             = actions,
+) { ItemRow(item) }
 ```
 
 ---
@@ -257,11 +308,17 @@ RevealAction(
 
 ```kotlin
 @Composable
-fun DragToReveal(
+fun <T> DragToReveal(
     actions: PersistentList<RevealAction>,
-    itemKey: String,
-    revealState: DragToRevealState,
+    itemKey: T,
+    revealState: DragToRevealState<T>,
     modifier: Modifier = Modifier,
+    initialAnchor: DragAnchor = DragAnchor.Resting,
+    enabled: Boolean = true,
+    fullDismissEnabled: Boolean = true,
+    positionalThreshold: (totalDistance: Float) -> Float = { it * 0.5f },
+    velocityThreshold: Dp = 125.dp,
+    animationSpec: AnimationSpec<Float> = spring(),
     defaultActionKey: String = actions.last().key,
     content: @Composable () -> Unit,
 )
@@ -270,9 +327,15 @@ fun DragToReveal(
 | Parameter | Description |
 |---|---|
 | `actions` | Ordered list of action slots. Put the primary/destructive action last. |
-| `itemKey` | Stable unique key — must match the key used in your `LazyColumn`. |
-| `revealState` | Shared state from `rememberDragToRevealState()`. Create at list level. |
+| `itemKey` | Stable unique key of any type `T` — must match the key used in your `LazyColumn` and the `T` of your `DragToRevealState`. |
+| `revealState` | Shared state from `rememberDragToRevealState<T>()`. Create at list level. |
 | `modifier` | Applied to the outermost container. |
+| `initialAnchor` | Anchor the row starts at, e.g. `DragAnchor.Peeked` to render pre-opened. |
+| `enabled` | When `false`, freezes the drag gesture and clears custom accessibility actions. |
+| `fullDismissEnabled` | When `false`, the `Dismissed` anchor is never registered — the gesture caps at `Peeked`. |
+| `positionalThreshold` | Fraction of the gap between anchors a drag must cross (by distance) to settle on the next anchor, as in `AnchoredDraggableState`. |
+| `velocityThreshold` | Fling speed above which a drag skips ahead to the next anchor regardless of `positionalThreshold`. |
+| `animationSpec` | Spring/tween used for `animateTo`/snap-back animations. |
 | `defaultActionKey` | Key of the stretching/full-swipe action. Defaults to `actions.last().key`. |
 | `content` | The foreground composable — your list item body. |
 
@@ -284,10 +347,9 @@ fun DragToReveal(
 data class RevealAction(
     val key: String,
     val width: Dp = 65.dp,
-    val backgroundColor: Color,
     val contentDescription: String,
     val onClick: () -> Unit,
-    val content: @Composable () -> Unit,
+    val content: @Composable (RevealActionSlotState) -> Unit,
 )
 ```
 
@@ -295,10 +357,28 @@ data class RevealAction(
 |---|---|
 | `key` | Stable unique identifier for this action. |
 | `width` | Fixed slot width. The default action stretches beyond this in phase 2. |
-| `backgroundColor` | Slot background colour. |
-| `contentDescription` | Accessibility label exposed to TalkBack. |
+| `contentDescription` | Accessibility label exposed to TalkBack, and the label for this action's `CustomAccessibilityAction`. |
 | `onClick` | Fires when the slot is tapped, or when this is the default and a full swipe completes. |
-| `content` | Composable rendered inside the slot. Typically an `Icon`. |
+| `content` | Composable rendered inside the slot, given the current `RevealActionSlotState`. Apply background colour/tint here — the library no longer paints a background or alpha for you. |
+
+---
+
+### `RevealActionSlotState`
+
+```kotlin
+@Immutable
+data class RevealActionSlotState(
+    val isDefault: Boolean,
+    val revealFraction: Float,
+    val isExpanded: Boolean,
+)
+```
+
+| Field | Description |
+|---|---|
+| `isDefault` | Whether this slot is the `defaultActionKey` action. |
+| `revealFraction` | `0f`–`1f` progress through phase 1 (Resting → Peeked). Clamped once phase 2 begins. |
+| `isExpanded` | `true` once the drag has passed the Peeked anchor — the default action is stretching in phase 2. |
 
 ---
 
@@ -306,15 +386,16 @@ data class RevealAction(
 
 ```kotlin
 @Stable
-class DragToRevealState {
-    val openItemKey: String?
+class DragToRevealState<T> {
+    val openItemKey: T?
+    fun closeAll()
 }
 
 @Composable
-fun rememberDragToRevealState(): DragToRevealState
+fun <T> rememberDragToRevealState(): DragToRevealState<T>
 ```
 
-Holds the key of whichever item is currently open. `null` when no item is open. Create one instance per list using `rememberDragToRevealState()` and pass it to every `DragToReveal` in that list.
+Holds the key of whichever item is currently open. `null` when no item is open. Create one instance per list using `rememberDragToRevealState<T>()` and pass it to every `DragToReveal` in that list. Call `closeAll()` to programmatically collapse the open row (e.g. on scroll or navigation).
 
 ---
 
@@ -323,17 +404,22 @@ Holds the key of whichever item is currently open. `null` when no item is open. 
 ```
 Settled ──────────────────────── 0px
                                    │
-         user swipes left          │  release < 50% of gap → snaps back
+         user swipes left          │  release < positionalThreshold → snaps back
                                    ▼
 Peeked ───────────────── -peekWidthPx   (sum of all action widths)
                                    │
-         user continues dragging   │  release < 50% of gap → snaps back
-                                   ▼  fast fling (≥ 200dp/s) → skips to Dismissed
-Dismissed ───────────── -fullWidthPx   (screen width + 200dp buffer)
+         user continues dragging   │  release < positionalThreshold → snaps back
+                                   ▼  fling ≥ velocityThreshold → skips to Dismissed
+Dismissed ───────────── -fullWidthPx   (container width)
                                    │
+                                   ├─ haptic tick fires on entering this anchor
                                    └─ fires defaultAction.onClick()
                                       snaps back to Settled
 ```
+
+Direction mirrors under RTL layouts (`LocalLayoutDirection`) — offsets above are for LTR.
+
+If `fullDismissEnabled = false`, the `Dismissed` anchor is never registered and the drag caps at `Peeked`.
 
 ---
 
@@ -391,6 +477,9 @@ DragToReveal(actions = actions, ...)
 | Colour-flood confirmation signal | ❌ | ✅ |
 | Tap outside to close | ❌ | ✅ |
 | Haptic feedback | ❌ | ✅ |
+| RTL support | ✅ | ✅ |
+| Optional full dismiss | ❌ | ✅ (`fullDismissEnabled`) |
+| Custom accessibility actions | ❌ | ✅ |
 
 ---
 
