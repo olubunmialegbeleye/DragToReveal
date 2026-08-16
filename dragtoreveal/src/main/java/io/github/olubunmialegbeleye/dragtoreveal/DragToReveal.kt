@@ -28,7 +28,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
@@ -170,6 +169,7 @@ fun RevealBackground(
     val density = LocalDensity.current
 
     val phase1Ratio = (revealedPx / peekWidthPx).coerceIn(0f, 1f)
+    val isExpanded = revealedPx > peekWidthPx
 
     val nonDefaultPeekPx =
         remember(actions, defaultActionKey, density) {
@@ -191,39 +191,29 @@ fun RevealBackground(
 
                 val slotWidthPx =
                     when {
-                        revealedPx <= peekWidthPx -> {
-                            with(density) { action.width.toPx() } * phase1Ratio
-                        }
-
-                        !isDefault -> {
-                            with(density) { action.width.toPx() }
-                        }
-
-                        else -> {
-                            revealedPx - nonDefaultPeekPx
-                        }
+                        !isExpanded -> with(density) { action.width.toPx() } * phase1Ratio
+                        !isDefault -> with(density) { action.width.toPx() }
+                        else -> revealedPx - nonDefaultPeekPx
                     }
 
-                val slotAlpha =
-                    when {
-                        revealedPx <= peekWidthPx -> phase1Ratio
-                        !isDefault -> 0.3f
-                        else -> 1f
-                    }
+                val slotState = RevealActionSlotState(
+                    isDefault = isDefault,
+                    revealFraction = phase1Ratio,
+                    isExpanded = isExpanded,
+                )
 
                 Box(
                     modifier =
                         Modifier
                             .width(with(density) { slotWidthPx.toDp() })
                             .fillMaxHeight()
-                            .alpha(slotAlpha)
                             .clickable(
                                 onClickLabel = action.contentDescription,
                                 onClick = { onActionClick(action.onClick) },
                             ),
                     contentAlignment = Alignment.Center,
                 ) {
-                    action.content()
+                    action.content(slotState)
                 }
             }
         }

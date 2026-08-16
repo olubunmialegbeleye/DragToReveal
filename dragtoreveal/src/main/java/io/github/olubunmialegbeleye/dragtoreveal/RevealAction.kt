@@ -9,5 +9,5 @@ data class RevealAction(
     val width: Dp = 65.dp,
     val contentDescription: String,
     val onClick: () -> Unit,
-    val content: @Composable () -> Unit,
+    val content: @Composable (RevealActionSlotState) -> Unit,
 )
