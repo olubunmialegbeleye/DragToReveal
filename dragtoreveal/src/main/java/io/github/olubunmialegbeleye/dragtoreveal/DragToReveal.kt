@@ -33,8 +33,14 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -103,6 +109,7 @@ fun<T> DragToReveal(
             itemKey = itemKey,
             revealState = revealState,
             currentDefaultAction = currentDefaultAction,
+            fullDismissEnabled = fullDismissEnabled,
         )
 
         val scope = rememberCoroutineScope()
@@ -129,7 +136,21 @@ fun<T> DragToReveal(
                 Modifier
                     .fillMaxWidth()
                     .offset { IntOffset(if (state.offset.isNaN()) 0 else state.offset.roundToInt(), 0) }
-                    .anchoredDraggable(state, Orientation.Horizontal, enabled = enabled),
+                    .anchoredDraggable(state, Orientation.Horizontal, enabled = enabled)
+                    .semantics {
+                        if (enabled) {
+                            stateDescription =
+                                if (revealState.openItemKey == itemKey) "Expanded" else "Collapsed"
+                            customActions = actions.map { action ->
+                                CustomAccessibilityAction(action.contentDescription) {
+                                    action.onClick()
+                                    true
+                                }
+                            }
+                        } else {
+                            customActions = emptyList()
+                        }
+                    },
             color = Color.Transparent,
         ) {
             content()
@@ -143,7 +164,11 @@ private fun<T> DragToRevealEffects(
     itemKey: T,
     revealState: DragToRevealState<T>,
     currentDefaultAction: RevealAction?,
+    fullDismissEnabled: Boolean,
 ) {
+    val haptic = LocalHapticFeedback.current
+    val latestDefaultAction by rememberUpdatedState(currentDefaultAction)
+
     LaunchedEffect(state) {
         snapshotFlow { state.currentValue }
             .distinctUntilChanged()
@@ -153,9 +178,20 @@ private fun<T> DragToRevealEffects(
                     DragAnchor.Peeked -> revealState.onItemOpened(itemKey)
                     DragAnchor.Dismissed -> {
                         // unreachable when fullDismissEnabled = false (anchor not registered)
-                        currentDefaultAction?.onClick()
+                        latestDefaultAction?.onClick()
                         state.snapTo(DragAnchor.Resting)
                     }
+                }
+            }
+    }
+
+    LaunchedEffect(state, fullDismissEnabled) {
+        if (!fullDismissEnabled) return@LaunchedEffect
+        snapshotFlow { state.targetValue }
+            .distinctUntilChanged()
+            .collectLatest { target ->
+                if (target == DragAnchor.Dismissed) {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 }
             }
     }
