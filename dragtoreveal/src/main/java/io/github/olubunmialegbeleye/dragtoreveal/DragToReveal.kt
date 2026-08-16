@@ -40,10 +40,10 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @Composable
-fun DragToReveal(
+fun<T> DragToReveal(
     actions: PersistentList<RevealAction>,
-    itemKey: String,
-    revealState: DragToRevealState,
+    itemKey: T,
+    revealState: DragToRevealState<T>,
     modifier: Modifier = Modifier,
     defaultActionKey: String = actions.last().key,
     content: @Composable (() -> Unit),
@@ -128,10 +128,10 @@ fun DragToReveal(
 }
 
 @Composable
-private fun DragToRevealEffects(
+private fun<T> DragToRevealEffects(
     state: AnchoredDraggableState<DragAnchor>,
-    itemKey: String,
-    revealState: DragToRevealState,
+    itemKey: T,
+    revealState: DragToRevealState<T>,
     currentDefaultAction: RevealAction?,
 ) {
     LaunchedEffect(state) {

@@ -6,18 +6,23 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 
-class DragToRevealState {
-    var openItemKey: String? by mutableStateOf(null)
+class DragToRevealState<T> {
+    var openItemKey: T? by mutableStateOf(null)
         private set
 
-    fun onItemOpened(key: String) {
+    fun onItemOpened(key: T) {
         openItemKey = key
     }
 
-    fun onItemClosed(key: String) {
+    fun onItemClosed(key: T) {
         if (openItemKey == key) openItemKey = null
+    }
+
+
+    fun closeAll() {
+        openItemKey = null
     }
 }
 
 @Composable
-fun rememberDragToRevealState(): DragToRevealState = remember { DragToRevealState() }
+fun <T> rememberDragToRevealState(): DragToRevealState<T> = remember { DragToRevealState() }

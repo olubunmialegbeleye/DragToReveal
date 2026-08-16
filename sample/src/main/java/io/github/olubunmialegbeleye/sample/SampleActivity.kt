@@ -105,7 +105,7 @@ fun SampleList(modifier: Modifier = Modifier) {
         )
     }
 
-    val revealState = rememberDragToRevealState()
+    val revealState = rememberDragToRevealState<String>()
 
     LazyColumn(modifier = modifier.fillMaxSize()) {
         items(items, key = { it.id }) { item ->
